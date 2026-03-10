@@ -1,45 +1,79 @@
-import {createComparison, defaultRules} from "../lib/compare.js";
-
-// @todo: #4.3 — настроить компаратор
-const compare = createComparison(defaultRules); 
+import { rules, compare } from "../lib/compare.js";
 
 export function initFiltering(elements, indexes) {
-    // @todo: #4.1 — заполнить выпадающие списки опциями
-Object.keys(indexes)                                    // Получаем ключи из объекта
-      .forEach((elementName) => {                        // Перебираем по именам
-        elements[elementName].append(                    // в каждый элемент добавляем опции
-            ...Object.values(indexes[elementName])        // формируем массив имён, значений опций
-                      .map(name => {                        // используйте name как значение и текстовое содержимое
-                        const option = document.createElement('option'); // создаем элемент
-                        option.value = name;           // значение = "Иванов"
-                        option.textContent = name;      // текст = "Иванов"
-                        return option;                             // @todo: создать и вернуть тег опции
-                      })
-        )
-     })
+    // Заполняем выпадающие списки опциями
+    Object.keys(indexes).forEach((elementName) => {
+        elements[elementName].append(
+            ...Object.values(indexes[elementName])
+                .map(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    return option;
+                })
+        );
+    });
+    
     return (data, state, action) => {
-        // @todo: #4.2 — обработать очистку поля
-         if (action && action.button && action.button.name === 'clear') {
-        const button = action.button;
-        
-        // 1. Находим поле ввода (input рядом с кнопкой)
-        const parent = button.parentElement; // родитель кнопки
-        const input = parent.querySelector('input'); // ищем input внутри родителя
-        
-        if (input) {
-            // 2. Сбрасываем value у input в DOM
-            input.value = '';
+        // Обработка кнопки очистки
+        if (action?.button?.name === 'clear') {
+            const button = action.button;
+            const parent = button.parentElement;
+            const input = parent?.querySelector('input, select');
             
-            // 3. Получаем название поля из data-field
-            const fieldName = button.dataset.field; // или button.getAttribute('data-field')
-            
-            // 4. Сбрасываем соответствующее поле в state
-            if (fieldName && state.filters) {
-                state.filters[fieldName] = '';
+            if (input) {
+                input.value = '';
+                const fieldName = button.dataset.field;
+                if (fieldName && state) {
+                    state[fieldName] = '';
+                }
             }
         }
-    }
-        // @todo: #4.5 — отфильтровать данные используя компаратор
-        return data.filter(row => compare(row, state)); 
-    }
+        
+        // Собираем ТОЛЬКО поля фильтрации из state
+        const filterState = {
+            seller: state?.seller || '',
+            totalFrom: state?.totalFrom || '',
+            totalTo: state?.totalTo || ''
+        };
+        
+        // Проверяем, есть ли активные фильтры
+        const hasActiveFilters = Object.values(filterState).some(v => v !== '');
+        if (!hasActiveFilters) return data;
+        
+        console.log('Фильтруем по:', filterState);
+        console.log('Данных до фильтрации:', data.length);
+        
+        // Фильтруем данные
+        const filteredData = data.filter(item => {
+            // Создаем целевой объект для сравнения
+            const target = {};
+            
+            // Добавляем фильтр по продавцу, если есть
+            if (filterState.seller) {
+                target.seller = filterState.seller;
+            }
+            
+            // Для числовых диапазонов используем специальный подход
+            if (filterState.totalFrom || filterState.totalTo) {
+                // Создаем массив [from, to] для правила arrayAsRange
+                target.total = [
+                    filterState.totalFrom ? parseFloat(filterState.totalFrom) : null,
+                    filterState.totalTo ? parseFloat(filterState.totalTo) : null
+                ];
+            }
+            
+            // Если нет активных фильтров для этого элемента, пропускаем
+            if (Object.keys(target).length === 0) return true;
+            
+            // Применяем правила сравнения
+            return compare(item, target, [
+                rules.skipEmptyTargetValues(),
+                rules.arrayAsRange() // правило для обработки массива как диапазона
+            ]);
+        });
+        
+        console.log('Данных после фильтрации:', filteredData.length);
+        return filteredData;
+    };
 }
