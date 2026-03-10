@@ -28,49 +28,73 @@ export function initFiltering(elements, indexes) {
                     state[fieldName] = '';
                 }
             }
+            return data; // Возвращаем все данные при очистке
         }
         
-        // Собираем ТОЛЬКО поля фильтрации из state
-        const filterState = {
-            seller: state?.seller || '',
-            totalFrom: state?.totalFrom || '',
-            totalTo: state?.totalTo || ''
-        };
+        // Собираем активные фильтры (только те, что не пустые)
+        const activeFilters = {};
         
-        // Проверяем, есть ли активные фильтры
-        const hasActiveFilters = Object.values(filterState).some(v => v !== '');
-        if (!hasActiveFilters) return data;
+        // Фильтр по дате (частичное совпадение)
+        if (state?.date && state.date.trim() !== '') {
+            activeFilters.date = state.date.trim();
+        }
         
-        console.log('Фильтруем по:', filterState);
+        // Фильтр по покупателю (точное совпадение)
+        if (state?.customer && state.customer.trim() !== '') {
+            activeFilters.customer = state.customer.trim();
+        }
+        
+        // Фильтр по продавцу (точное совпадение из выпадающего списка)
+        if (state?.seller && state.seller.trim() !== '') {
+            activeFilters.seller = state.seller.trim();
+        }
+        
+        // Числовые фильтры (уже работают)
+        if (state?.totalFrom && state.totalFrom.trim() !== '') {
+            activeFilters.totalFrom = parseFloat(state.totalFrom);
+        }
+        
+        if (state?.totalTo && state.totalTo.trim() !== '') {
+            activeFilters.totalTo = parseFloat(state.totalTo);
+        }
+        
+        // Если нет активных фильтров, возвращаем все данные
+        if (Object.keys(activeFilters).length === 0) {
+            return data;
+        }
+        
+        console.log('Активные фильтры:', activeFilters);
         console.log('Данных до фильтрации:', data.length);
         
         // Фильтруем данные
         const filteredData = data.filter(item => {
-            // Создаем целевой объект для сравнения
-            const target = {};
-            
-            // Добавляем фильтр по продавцу, если есть
-            if (filterState.seller) {
-                target.seller = filterState.seller;
+            // Фильтр по дате (частичное совпадение, регистронезависимое)
+            if (activeFilters.date && !item.date.includes(activeFilters.date)) {
+                return false;
             }
             
-            // Для числовых диапазонов используем специальный подход
-            if (filterState.totalFrom || filterState.totalTo) {
-                // Создаем массив [from, to] для правила arrayAsRange
-                target.total = [
-                    filterState.totalFrom ? parseFloat(filterState.totalFrom) : null,
-                    filterState.totalTo ? parseFloat(filterState.totalTo) : null
-                ];
+            // Фильтр по покупателю (частичное совпадение, регистронезависимое)
+            if (activeFilters.customer && 
+                !item.customer.toLowerCase().includes(activeFilters.customer.toLowerCase())) {
+                return false;
             }
             
-            // Если нет активных фильтров для этого элемента, пропускаем
-            if (Object.keys(target).length === 0) return true;
+            // Фильтр по продавцу (точное совпадение)
+            if (activeFilters.seller && item.seller !== activeFilters.seller) {
+                return false;
+            }
             
-            // Применяем правила сравнения
-            return compare(item, target, [
-                rules.skipEmptyTargetValues(),
-                rules.arrayAsRange() // правило для обработки массива как диапазона
-            ]);
+            // Фильтр по минимальной сумме
+            if (activeFilters.totalFrom !== undefined && item.total < activeFilters.totalFrom) {
+                return false;
+            }
+            
+            // Фильтр по максимальной сумме
+            if (activeFilters.totalTo !== undefined && item.total > activeFilters.totalTo) {
+                return false;
+            }
+            
+            return true;
         });
         
         console.log('Данных после фильтрации:', filteredData.length);
