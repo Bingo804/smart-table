@@ -34,7 +34,7 @@ return {                                            // расширьте сущ
  */
 
 async function render(action) {
-    let state = collectState(); // состояние полей из таблицы
+    const state = collectState(); // состояние полей из таблицы
     let query = {}; // копируем для последующего изменения
     // @todo: использование
     query = applySearching(query, state, action);
