@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "vite": "^6.0.5"
+  },
+  "dependencies": {
+    "fastest-validator": "^1.19.1"
   }
 }
